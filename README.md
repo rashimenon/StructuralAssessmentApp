@@ -37,7 +37,7 @@ npm install -g expo-cli
 
 ## 1. Clone the repo
 ```bash
-git clone https://github.com/YOUR_USERNAME/StructuralAssessmentApp.git
+git clone https://github.com/rashimenon/StructuralAssessmentApp.git
 cd StructuralAssessmentApp
 ```
 
