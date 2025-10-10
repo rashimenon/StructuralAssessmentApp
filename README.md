@@ -1,50 +1,77 @@
-# Welcome to your Expo app 👋
+# Structural Assessment App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A React Native / Expo app for surveying and mapping building structures, capturing photos, and recording hazards. Designed for field data collection with GPS integration.
 
-## Get started
+---
 
-1. Install dependencies
+## Features
 
-   ```bash
-   npm install
-   ```
+- **Building Details Capture:** Input building name, surveyor, structural typology, occupancy type, floors, material, and footprint.
+- **Location Integration:** Automatically fetch GPS coordinates and address of the building.
+- **Photo Capture:** Take multiple photos of the building and map their locations.
+- **Hazard Mapping:** Mark hazards like cracks, leaks, fire risks, electrical issues, and blocked exits on the building map.
+- **Flow:** Location → Building Details → Photo Capture → Map Photos → Hazard Mapping → Summary.
 
-2. Start the app
+---
 
-   ```bash
-   npx expo start
-   ```
+## Screens / Flow
 
-In the output, you'll find options to open the app in a
+1. **Location Info** – Fetch device GPS and address.  
+2. **Building Details** – Fill in building info and characteristics.  
+3. **Photo Capture** – Take up to 10 photos of the building.  
+4. **Building Map** – Place each photo on a satellite map.  
+5. **Hazard Mapping** – Mark hazards with icons and save.  
+6. **Summary** – Review all collected data (optional).
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+---
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Requirements
 
-## Get a fresh project
-
-When you're ready, run:
-
+- Node.js ≥ 18.x  
+- npm ≥ 9.x or yarn ≥ 1.x  
+- Expo CLI:  
 ```bash
-npm run reset-project
+npm install -g expo-cli
+```
+# Setup & Run
+
+## 1. Clone the repo
+```bash
+git clone https://github.com/YOUR_USERNAME/StructuralAssessmentApp.git
+cd StructuralAssessmentApp
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## 2. Install dependencies
+```bash
+npm install
+# or
+yarn install
+```
 
-## Learn more
+## 3. Start Expo
+```bash
+npx expo start
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+## 4. Run on device
+- Scan the QR code using Expo Go (iOS / Android)
+- Or run on emulator:
+```bash
+npx expo run:android
+npx expo run:ios
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Project Structure
+app/
+ ├─ location-info.tsx
+ ├─ building-details.tsx
+ ├─ photo-capture.js
+ ├─ building-map.js
+ ├─ hazard-map.js
+ ├─ _layout.tsx
+assets/
+ ├─ images/
+ ├─ structural/
+ ├─ materials/
+lib/
+ ├─ localStorage.js
