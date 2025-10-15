@@ -1,29 +1,27 @@
 // app/building-details.tsx
+import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { saveData } from '../lib/localStorage'; // <-- make sure this path matches where you put localStorage.ts
-
 import {
-  Button,
-  FlatList,
   Image,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
+import { saveData } from '../lib/localStorage';
 
 export default function BuildingDetailsScreen() {
-  // --- Basic Info ---
   const [buildingName, setBuildingName] = useState('');
   const [surveyorName, setSurveyorName] = useState('');
   const [address, setAddress] = useState('');
   const [coordinates, setCoordinates] = useState<{ lat: number; lon: number } | null>(null);
   const [timestamp, setTimestamp] = useState('');
 
-  // --- Fetch GPS coordinates ---
+  // Fetch GPS
   useEffect(() => {
     const getLocation = async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
@@ -31,55 +29,45 @@ export default function BuildingDetailsScreen() {
         alert('Permission to access location was denied');
         return;
       }
-
       let location = await Location.getCurrentPositionAsync({});
       setCoordinates({
         lat: location.coords.latitude,
         lon: location.coords.longitude,
       });
-
-      let geocode = await Location.reverseGeocodeAsync(location.coords);
-      if (geocode.length > 0) {
-        const place = geocode[0];
-        setAddress(`${place.name || ''}, ${place.city || ''}, ${place.region || ''}`);
+      try {
+        let geocode = await Location.reverseGeocodeAsync(location.coords);
+        if (geocode.length > 0) {
+          const place = geocode[0];
+          setAddress(`${place.name || ''}, ${place.city || ''}, ${place.region || ''}`);
+        }
+      } catch (e) {
+        console.warn('Reverse geocode failed');
       }
-
-      setTimestamp(new Date().toISOString());
+      setTimestamp(new Date().toLocaleString());
     };
-
     getLocation();
   }, []);
 
-  // --- Structural Typology ---
   const [structuralType, setStructuralType] = useState<string | null>(null);
   const structuralOptions = [
     { label: 'Unreinforced Masonry', value: 'URM', image: require('../assets/images/structural/urm.png') },
-    { label: 'RC Frame w/ Masonry Infill', value: 'RC', image: require('../assets/images/structural/rc_frame.png') },
+    { label: 'RC Frame + Infill', value: 'RC', image: require('../assets/images/structural/rc_frame.png') },
   ];
 
-  // --- Occupancy Type ---
   const [selectedOccupancy, setSelectedOccupancy] = useState<string[]>([]);
   const occupancyOptions = [
-    'Residential', 'Educational', 'Healthcare', 'Police Station / HQ', 'Fire Station',
-    'Food & Civil Supplies', 'Transportation Facility', 'Power Facility', 'Communication Facility',
-    'Disaster Management Facility', 'Business / Mercantile', 'Governance Facility',
+    'Residential', 'Educational', 'Healthcare', 'Police Station', 'Fire Station',
+    'Transportation', 'Power Facility', 'Communication', 'Governance',
   ];
-  const toggleOccupancy = (category: string) => {
+  const toggleOccupancy = (category: string) =>
     setSelectedOccupancy((prev) =>
       prev.includes(category) ? prev.filter((c) => c !== category) : [...prev, category]
     );
-  };
 
-  // --- Building Age ---
   const [buildingAge, setBuildingAge] = useState<string | null>(null);
-  const ageOptions = ['Pre-1990', 'Post-1990'];
-
-  // --- Floors, Footprint ---
   const [floors, setFloors] = useState('');
   const [footprint, setFootprint] = useState('');
-
-  // --- Construction Material ---
-  const [material, setMaterial] = useState<string | null>(null);
+  const [selectedMaterials, setSelectedMaterials] = useState<string[]>([]);
   const materialOptions = [
     { label: 'Brick', value: 'brick', image: require('../assets/images/materials/brick.png') },
     { label: 'Stone', value: 'stone', image: require('../assets/images/materials/stone.png') },
@@ -88,7 +76,11 @@ export default function BuildingDetailsScreen() {
     { label: 'Adobe/Mud', value: 'adobe', image: require('../assets/images/materials/adobe.png') },
   ];
 
-  // --- Handle Save (async!)
+  const toggleMaterial = (value: string) =>
+    setSelectedMaterials((prev) =>
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
+    );
+
   const handleSaveAndContinue = async () => {
     const data = {
       buildingName,
@@ -101,284 +93,234 @@ export default function BuildingDetailsScreen() {
       buildingAge,
       floors,
       footprint,
-      material,
+      selectedMaterials,
     };
 
-    // Save offline using AsyncStorage via your helper
-    try {
-      await saveData('buildingDetails', data);
-      console.log('Saved buildingDetails locally');
-    } catch (e) {
-      console.warn('Failed to save locally:', e);
-    }
-
-    // Navigate to photo capture
+    await saveData('buildingDetails', data);
+    console.log('✅ Saved buildingDetails locally');
     router.push(`../photo-capture?buildingData=${encodeURIComponent(JSON.stringify(data))}`);
   };
 
-  // --- Form Sections ---
-  const formSections = [
-    {
-      key: 'basicInfo',
-      component: (
-        <View>
-          <Text style={styles.header}>Basic Info</Text>
-
-          <Text style={styles.label}>Building Name</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter building name"
-            placeholderTextColor="#aaa"
-            value={buildingName}
-            onChangeText={setBuildingName}
-          />
-
-          <Text style={styles.label}>Surveyor Name</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter surveyor name"
-            placeholderTextColor="#aaa"
-            value={surveyorName}
-            onChangeText={setSurveyorName}
-          />
-
-          <Text style={styles.label}>Coordinates</Text>
-          <Text style={styles.coordinateText}>
-            {coordinates ? `${coordinates.lat.toFixed(6)}, ${coordinates.lon.toFixed(6)}` : 'Fetching...'}
-          </Text>
-
-          <Text style={styles.label}>Address</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter address"
-            placeholderTextColor="#aaa"
-            value={address}
-            onChangeText={setAddress}
-          />
-
-          <Text style={styles.label}>Timestamp</Text>
-          <Text style={styles.coordinateText}>{timestamp || 'Fetching...'}</Text>
-        </View>
-      ),
-    },
-    {
-      key: 'structuralType',
-      component: (
-        <View>
-          <Text style={styles.label}>Structural Typology</Text>
-          <View style={styles.optionsContainer}>
-            {structuralOptions.map((option) => (
-              <TouchableOpacity
-                key={option.value}
-                style={[
-                  styles.imageOptionButton,
-                  structuralType === option.value && styles.selectedOption,
-                ]}
-                onPress={() => setStructuralType(option.value)}
-              >
-                <Image source={option.image} style={styles.optionImage} />
-                <Text
-                  style={[
-                    styles.optionText,
-                    structuralType === option.value && styles.selectedOptionText,
-                  ]}
-                >
-                  {option.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      ),
-    },
-    {
-      key: 'occupancy',
-      component: (
-        <View>
-          <Text style={styles.label}>Occupancy Type</Text>
-          <View style={styles.optionsContainer}>
-            {occupancyOptions.map((option) => (
-              <TouchableOpacity
-                key={option}
-                style={[
-                  styles.optionButton,
-                  selectedOccupancy.includes(option) && styles.selectedOption,
-                ]}
-                onPress={() => toggleOccupancy(option)}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    selectedOccupancy.includes(option) && styles.selectedOptionText,
-                  ]}
-                >
-                  {option}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      ),
-    },
-    {
-      key: 'buildingAge',
-      component: (
-        <View>
-          <Text style={styles.label}>Building Age</Text>
-          <View style={styles.optionsContainer}>
-            {ageOptions.map((option) => (
-              <TouchableOpacity
-                key={option}
-                style={[
-                  styles.optionButton,
-                  buildingAge === option && styles.selectedOption,
-                ]}
-                onPress={() => setBuildingAge(option)}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    buildingAge === option && styles.selectedOptionText,
-                  ]}
-                >
-                  {option}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      ),
-    },
-    {
-      key: 'floors',
-      component: (
-        <View>
-          <Text style={styles.label}>Number of Floors</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            placeholder="Enter number of floors"
-            placeholderTextColor="#aaa"
-            value={floors}
-            onChangeText={setFloors}
-          />
-        </View>
-      ),
-    },
-    {
-      key: 'footprint',
-      component: (
-        <View>
-          <Text style={styles.label}>Approximate Footprint Size (sq. m)</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            placeholder="Enter area"
-            placeholderTextColor="#aaa"
-            value={footprint}
-            onChangeText={setFootprint}
-          />
-        </View>
-      ),
-    },
-    {
-      key: 'material',
-      component: (
-        <View>
-          <Text style={styles.label}>Construction Material</Text>
-          <View style={styles.optionsContainer}>
-            {materialOptions.map((option) => (
-              <TouchableOpacity
-                key={option.value}
-                style={[
-                  styles.imageOptionButton,
-                  material === option.value && styles.selectedOption,
-                ]}
-                onPress={() => setMaterial(option.value)}
-              >
-                <Image source={option.image} style={styles.optionImage} />
-                <Text
-                  style={[
-                    styles.optionText,
-                    material === option.value && styles.selectedOptionText,
-                  ]}
-                >
-                  {option.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      ),
-    },
-    {
-      key: 'button',
-      component: (
-        <View style={{ marginTop: 20, marginBottom: 40 }}>
-          <Button
-            title="Save & Continue"
-            onPress={handleSaveAndContinue} // <-- async handler used directly
-            disabled={
-              !buildingName ||
-              !surveyorName ||
-              !structuralType ||
-              !buildingAge ||
-              !floors ||
-              !footprint ||
-              !material
-            }
-          />
-        </View>
-      ),
-    },
-  ];
-
   return (
-    <FlatList
-      data={formSections}
-      keyExtractor={(item) => item.key}
-      renderItem={({ item }) => item.component}
-      contentContainerStyle={styles.container}
-      keyboardShouldPersistTaps="handled"
-    />
+    <ScrollView style={styles.container}>
+      <Text style={styles.header}>🏢 Building Details</Text>
+
+      {/* Basic Info */}
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>
+          <Ionicons name="information-circle-outline" size={18} color="#00e6a8" /> Basic Info
+        </Text>
+
+        <TextInput
+          style={styles.input}
+          placeholder="Building Name"
+          placeholderTextColor="#888"
+          value={buildingName}
+          onChangeText={setBuildingName}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Surveyor Name"
+          placeholderTextColor="#888"
+          value={surveyorName}
+          onChangeText={setSurveyorName}
+        />
+        <Text style={styles.subText}>
+          📍 {coordinates ? `${coordinates.lat.toFixed(5)}, ${coordinates.lon.toFixed(5)}` : 'Fetching...'}
+        </Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Address"
+          placeholderTextColor="#888"
+          value={address}
+          onChangeText={setAddress}
+        />
+        <Text style={styles.subText}>🕒 {timestamp || 'Fetching...'}</Text>
+      </View>
+
+      {/* Structural Type */}
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>🏗️ Structural Typology</Text>
+        <View style={styles.rowWrap}>
+          {structuralOptions.map((opt) => (
+            <TouchableOpacity
+              key={opt.value}
+              style={[styles.imageOption, structuralType === opt.value && styles.selected]}
+              onPress={() => setStructuralType(opt.value)}
+            >
+              <Image source={opt.image} style={styles.optionImage} />
+              <Text style={styles.optionLabel}>{opt.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* Occupancy */}
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>🏠 Occupancy Type</Text>
+        <View style={styles.rowWrap}>
+          {occupancyOptions.map((opt) => (
+            <TouchableOpacity
+              key={opt}
+              style={[styles.chip, selectedOccupancy.includes(opt) && styles.chipSelected]}
+              onPress={() => toggleOccupancy(opt)}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  selectedOccupancy.includes(opt) && styles.chipTextSelected,
+                ]}
+              >
+                {opt}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* Building Age */}
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>🏗️ Building Age</Text>
+        <View style={styles.rowWrap}>
+          {['Pre-1990', 'Post-1990'].map((opt) => (
+            <TouchableOpacity
+              key={opt}
+              style={[styles.chip, buildingAge === opt && styles.chipSelected]}
+              onPress={() => setBuildingAge(opt)}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  buildingAge === opt && styles.chipTextSelected,
+                ]}
+              >
+                {opt}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* Floors and Footprint */}
+      <View style={styles.card}>
+        <TextInput
+          style={styles.input}
+          keyboardType="numeric"
+          placeholder="Number of Floors"
+          placeholderTextColor="#888"
+          value={floors}
+          onChangeText={setFloors}
+        />
+        <TextInput
+          style={styles.input}
+          keyboardType="numeric"
+          placeholder="Footprint (sq.m)"
+          placeholderTextColor="#888"
+          value={footprint}
+          onChangeText={setFootprint}
+        />
+      </View>
+
+      {/* Materials */}
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>🏗️ Construction Materials</Text>
+        <View style={styles.rowWrap}>
+          {materialOptions.map((opt) => (
+            <TouchableOpacity
+              key={opt.value}
+              style={[styles.imageOption, selectedMaterials.includes(opt.value) && styles.selected]}
+              onPress={() => toggleMaterial(opt.value)}
+            >
+              <Image source={opt.image} style={styles.optionImage} />
+              <Text style={styles.optionLabel}>{opt.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      <TouchableOpacity
+        style={[
+          styles.saveButton,
+          !(
+            buildingName &&
+            surveyorName &&
+            structuralType &&
+            buildingAge &&
+            floors &&
+            footprint &&
+            selectedMaterials.length > 0
+          ) && { opacity: 0.5 },
+        ]}
+        onPress={handleSaveAndContinue}
+        disabled={
+          !buildingName ||
+          !surveyorName ||
+          !structuralType ||
+          !buildingAge ||
+          !floors ||
+          !footprint ||
+          selectedMaterials.length === 0
+        }
+      >
+        <Text style={styles.saveButtonText}>💾 Save & Continue</Text>
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20, backgroundColor: '#000' },
-  header: { fontSize: 22, fontWeight: 'bold', color: '#fff', marginBottom: 20, textAlign: 'center' },
-  label: { fontSize: 16, color: '#fff', marginTop: 20, marginBottom: 8 },
-  coordinateText: { color: '#fff', fontSize: 14, marginBottom: 10 },
-  optionsContainer: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 },
-  optionButton: {
-    borderWidth: 1,
-    borderColor: '#666',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    margin: 5,
-    backgroundColor: '#111',
+  container: { flex: 1, backgroundColor: '#0b0b0f', padding: 16 },
+  header: { fontSize: 26, color: '#00e6a8', fontWeight: '700', marginBottom: 16, textAlign: 'center' },
+  card: {
+    backgroundColor: '#1a1a1f',
+    borderRadius: 14,
+    padding: 16,
+    marginVertical: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
   },
-  imageOptionButton: {
-    borderWidth: 1,
-    borderColor: '#666',
-    borderRadius: 8,
-    margin: 5,
-    alignItems: 'center',
-    padding: 5,
-    backgroundColor: '#111',
-    width: 100,
-  },
-  selectedOption: { backgroundColor: '#4CAF50', borderColor: '#4CAF50' },
-  optionText: { color: '#fff', textAlign: 'center' },
-  selectedOptionText: { fontWeight: 'bold', color: '#fff' },
+  sectionTitle: { color: '#00e6a8', fontWeight: '600', marginBottom: 10, fontSize: 16 },
   input: {
-    borderWidth: 1,
-    borderColor: '#666',
+    backgroundColor: '#222',
+    borderRadius: 10,
     padding: 10,
-    borderRadius: 8,
-    backgroundColor: '#111',
     color: '#fff',
+    marginVertical: 6,
+    borderWidth: 1,
+    borderColor: '#333',
   },
-  optionImage: { width: 80, height: 80, marginBottom: 5 },
+  subText: { color: '#aaa', fontSize: 14, marginTop: 4 },
+  rowWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  imageOption: {
+    alignItems: 'center',
+    backgroundColor: '#222',
+    borderRadius: 10,
+    margin: 5,
+    padding: 8,
+    width: 90,
+  },
+  selected: { backgroundColor: '#00e6a8' },
+  optionImage: { width: 70, height: 70, borderRadius: 8, marginBottom: 4 },
+  optionLabel: { color: '#fff', fontSize: 12, textAlign: 'center' },
+  chip: {
+    borderWidth: 1,
+    borderColor: '#555',
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    margin: 4,
+    backgroundColor: '#222',
+  },
+  chipSelected: { backgroundColor: '#00e6a8', borderColor: '#00e6a8' },
+  chipText: { color: '#fff' },
+  chipTextSelected: { color: '#000', fontWeight: '600' },
+  saveButton: {
+    backgroundColor: '#00e6a8',
+    marginVertical: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    padding: 14,
+  },
+  saveButtonText: { color: '#000', fontWeight: 'bold', fontSize: 16 },
 });

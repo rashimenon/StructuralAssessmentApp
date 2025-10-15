@@ -1,49 +1,57 @@
+import * as Location from "expo-location";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Button, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import MapView, { Marker } from "react-native-maps";
-import { loadData, saveData } from "../lib/localStorage"; // ✅ import offline storage helpers
+import { saveData } from "../lib/localStorage";
 
 const hazardTypes = [
-  { type: "crack", icon: "🧱", color: "red" },
-  { type: "leak", icon: "💧", color: "blue" },
-  { type: "electrical", icon: "⚡", color: "yellow" },
-  { type: "blocked_exit", icon: "🚪", color: "orange" },
-  { type: "fire", icon: "🔥", color: "crimson" },
+  { type: "Crack", icon: "🧱", color: "red" },
+  { type: "Water Leak", icon: "💧", color: "deepskyblue" },
+  { type: "Electrical Fault", icon: "⚡", color: "gold" },
+  { type: "Blocked Exit", icon: "🚪", color: "orange" },
+  { type: "Fire", icon: "🔥", color: "crimson" },
 ];
 
 export default function HazardMappingScreen() {
-  const { buildingData, region } = useLocalSearchParams();
+  const { buildingData } = useLocalSearchParams();
   const parsedData = buildingData ? JSON.parse(buildingData) : null;
 
+  const [mapRegion, setMapRegion] = useState(null);
   const [hazards, setHazards] = useState([]);
   const [selectedHazard, setSelectedHazard] = useState(hazardTypes[0]);
-  const [mapRegion, setMapRegion] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // 🟩 load region from previous screen
+  // 🧭 Fetch current GPS location
   useEffect(() => {
-    if (region) {
-      try {
-        setMapRegion(JSON.parse(region));
-      } catch (e) {
-        console.warn("Invalid region data:", e);
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission Denied", "Location access is required to view the map.");
+        setLoading(false);
+        return;
       }
-    }
-  }, [region]);
 
-  // 🧠 Restore saved hazards if any
-  useEffect(() => {
-    const loadOfflineData = async () => {
-      const saved = await loadData("offlineHazards");
-      if (saved && saved.hazards) {
-        setHazards(saved.hazards);
-        if (saved.region) setMapRegion(saved.region);
-        console.log("📍 Restored offline hazards");
-      }
-    };
-    loadOfflineData();
+      const current = await Location.getCurrentPositionAsync({});
+      const region = {
+        latitude: current.coords.latitude,
+        longitude: current.coords.longitude,
+        latitudeDelta: 0.002,
+        longitudeDelta: 0.002,
+      };
+      setMapRegion(region);
+      setLoading(false);
+    })();
   }, []);
 
+  // 🟩 Add a new hazard marker
   const handleMapPress = (e) => {
     const { latitude, longitude } = e.nativeEvent.coordinate;
     setHazards((prev) => [
@@ -51,12 +59,27 @@ export default function HazardMappingScreen() {
       {
         id: prev.length + 1,
         type: selectedHazard.type,
+        icon: selectedHazard.icon,
+        color: selectedHazard.color,
         coords: { latitude, longitude },
       },
     ]);
   };
 
+  // 🔁 Allow repositioning markers
+  const handleDragEnd = (id, newCoords) => {
+    setHazards((prev) =>
+      prev.map((h) => (h.id === id ? { ...h, coords: newCoords } : h))
+    );
+  };
+
+  // 💾 Save data and move to summary
   const handleSave = async () => {
+    if (!hazards.length) {
+      Alert.alert("No Hazards", "Please mark at least one hazard before finishing.");
+      return;
+    }
+
     const finalData = {
       hazards,
       region: mapRegion,
@@ -64,10 +87,12 @@ export default function HazardMappingScreen() {
       timestamp: new Date().toISOString(),
     };
 
-    await saveData("offlineHazards", finalData);
-    console.log("✅ Offline hazards saved!");
-
-    alert("Hazards saved (offline)!");
+    try {
+      await saveData("offlineHazards", finalData);
+      console.log("✅ Hazards saved locally");
+    } catch (error) {
+      console.error("Error saving hazards:", error);
+    }
 
     router.push({
       pathname: "/summary",
@@ -78,83 +103,118 @@ export default function HazardMappingScreen() {
     });
   };
 
-  if (!mapRegion) {
+  if (loading || !mapRegion) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#00ffcc" />
-        <Text style={{ color: "#fff" }}>Loading map region...</Text>
+        <Text style={{ color: "#fff", marginTop: 10 }}>Fetching GPS location...</Text>
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: "#000" }}>
       <MapView
         style={{ flex: 1 }}
-        mapType="satellite"
+        mapType="hybrid"
         onPress={handleMapPress}
         region={mapRegion}
       >
-        {hazards.map((hazard) => {
-          const hazardInfo = hazardTypes.find((h) => h.type === hazard.type);
-          return (
-            <Marker
-              key={hazard.id}
-              coordinate={hazard.coords}
-              title={hazard.type.replace("_", " ")}
-              description={`Hazard #${hazard.id}`}
-              pinColor={hazardInfo?.color || "red"}
-            >
-              <Text style={{ fontSize: 20 }}>{hazardInfo?.icon}</Text>
-            </Marker>
-          );
-        })}
+        {hazards.map((hazard) => (
+          <Marker
+            key={hazard.id}
+            coordinate={hazard.coords}
+            title={hazard.type}
+            pinColor={hazard.color}
+            draggable
+            onDragEnd={(e) => handleDragEnd(hazard.id, e.nativeEvent.coordinate)}
+          >
+            <View style={styles.markerContainer}>
+              <Text style={styles.markerIcon}>{hazard.icon}</Text>
+              <Text style={styles.markerLabel}>{hazard.type}</Text>
+            </View>
+          </Marker>
+        ))}
       </MapView>
 
-      {/* Hazard Toolbar */}
-      <View style={styles.hazardBar}>
-        {hazardTypes.map((hazard) => (
-          <TouchableOpacity
-            key={hazard.type}
-            style={[
-              styles.hazardButton,
-              selectedHazard.type === hazard.type && styles.selectedButton,
-            ]}
-            onPress={() => setSelectedHazard(hazard)}
-          >
-            <Text style={{ fontSize: 22 }}>{hazard.icon}</Text>
-          </TouchableOpacity>
-        ))}
+      {/* 🧰 Hazard Type Toolbar */}
+      <View style={styles.toolbar}>
+        <Text style={styles.toolbarTitle}>Select Hazard Type:</Text>
+        <View style={styles.hazardList}>
+          {hazardTypes.map((hazard) => (
+            <TouchableOpacity
+              key={hazard.type}
+              style={[
+                styles.hazardButton,
+                selectedHazard.type === hazard.type && styles.selectedHazard,
+              ]}
+              onPress={() => setSelectedHazard(hazard)}
+            >
+              <Text style={{ fontSize: 18 }}>{hazard.icon}</Text>
+              <Text style={styles.hazardText}>{hazard.type}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
-      <Button title="Save Hazards & Finish" onPress={handleSave} />
+      {/* 💾 Save Button */}
+      <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+        <Text style={styles.saveButtonText}>✅ Save & Finish</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#000",
-  },
-  hazardBar: {
+  center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" },
+  markerContainer: { alignItems: "center" },
+  markerIcon: { fontSize: 20 },
+  markerLabel: { color: "#fff", fontSize: 10, textAlign: "center" },
+  toolbar: {
     position: "absolute",
-    bottom: 80,
+    bottom: 100,
     left: 0,
     right: 0,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+  },
+  toolbarTitle: { color: "#fff", fontSize: 14, marginBottom: 5, textAlign: "center" },
+  hazardList: {
     flexDirection: "row",
     justifyContent: "space-around",
-    backgroundColor: "rgba(0,0,0,0.5)",
-    paddingVertical: 8,
+    flexWrap: "wrap",
   },
   hazardButton: {
-    padding: 10,
+    alignItems: "center",
+    backgroundColor: "#222",
     borderRadius: 10,
-    backgroundColor: "#333",
+    padding: 8,
+    margin: 5,
+    width: 90,
   },
-  selectedButton: {
-    backgroundColor: "#666",
+  selectedHazard: {
+    backgroundColor: "#00ffcc",
+  },
+  hazardText: {
+    color: "#fff",
+    fontSize: 12,
+    textAlign: "center",
+    marginTop: 4,
+  },
+  saveButton: {
+    position: "absolute",
+    bottom: 20,
+    left: 20,
+    right: 20,
+    backgroundColor: "#00ffcc",
+    paddingVertical: 15,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#000",
   },
 });
