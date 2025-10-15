@@ -85,8 +85,9 @@ export default function HazardMappingScreen() {
       region: mapRegion,
       building: parsedData,
       timestamp: new Date().toISOString(),
-    };
-
+    }
+    
+    
     try {
       await saveData("offlineHazards", finalData);
       console.log("✅ Hazards saved locally");
@@ -95,7 +96,7 @@ export default function HazardMappingScreen() {
     }
 
     router.push({
-      pathname: "/summary",
+      pathname: "/voice-record",
       params: {
         hazards: JSON.stringify(hazards),
         buildingData: JSON.stringify(parsedData),
